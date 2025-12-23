@@ -1,29 +1,63 @@
 ﻿import React, { useEffect, useState } from "react";
 
 export default function App() {
+  // ===== AUTH =====
+  const [user, setUser] = useState(null); // { username, role, table_number }
+  const [login, setLogin] = useState("");
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+
+  // ===== DATA =====
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Поля формы
+  // ===== FORM =====
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [tableNumber, setTableNumber] = useState("");
   const [note, setNote] = useState("");
 
-  // Редактирование
-  const [editingId, setEditingId] = useState(null);
-  const [editValues, setEditValues] = useState({});
+  const API_URL = "http://127.0.0.1:8000";
 
-  const API_URL = "http://127.0.0.1:8000/rows";
+  // ======================
+  // LOGIN
+  // ======================
+  const handleLogin = async () => {
+    setAuthError("");
+    try {
+      const res = await fetch(`${API_URL}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: login,
+          password: password,
+        }),
+      });
 
-  // Загрузка строк
+      if (!res.ok) throw new Error("Неверный логин или пароль");
+
+      const data = await res.json();
+      setUser(data); // { username, role, table_number }
+    } catch (err) {
+      setAuthError(err.message);
+    }
+  };
+
+  const logout = () => {
+    setUser(null);
+    setRows([]);
+  };
+
+  // ======================
+  // LOAD ROWS
+  // ======================
   const loadRows = async () => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(API_URL);
-      if (!res.ok) throw new Error("Failed to fetch");
+      const res = await fetch(`${API_URL}/rows`);
+      if (!res.ok) throw new Error("Ошибка загрузки данных");
       const data = await res.json();
       setRows(data);
     } catch (err) {
@@ -34,26 +68,38 @@ export default function App() {
   };
 
   useEffect(() => {
-    loadRows();
-  }, []);
+    if (user) {
+      loadRows();
+    }
+  }, [user]);
 
-  // Добавление строки
+  // ======================
+  // ADD ROW
+  // ======================
   const addRow = async () => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(API_URL, {
+      const res = await fetch(`${API_URL}/rows`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
           price: Number(price),
-          table_number: Number(tableNumber),
+          table_number:
+            user.role === "client"
+              ? user.table_number
+              : Number(tableNumber),
           note,
         }),
       });
+
       if (!res.ok) throw new Error("Ошибка добавления");
-      setName(""); setPrice(""); setTableNumber(""); setNote("");
+
+      setName("");
+      setPrice("");
+      setTableNumber("");
+      setNote("");
       loadRows();
     } catch (err) {
       setError(err.message);
@@ -62,80 +108,93 @@ export default function App() {
     }
   };
 
-  // Удаление строки
+  // ======================
+  // DELETE
+  // ======================
   const deleteRow = async (id) => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch(`${API_URL}/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Ошибка удаления");
-      loadRows();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    await fetch(`${API_URL}/rows/${id}`, { method: "DELETE" });
+    loadRows();
   };
 
-  // Начало редактирования
-  const startEditing = (row) => {
-    setEditingId(row.id);
-    setEditValues({
-      name: row.name,
-      price: row.price,
-      table_number: row.table_number,
-      note: row.note,
-    });
-  };
+  // ======================
+  // RENDER LOGIN
+  // ======================
+  if (!user) {
+    return (
+      <div style={{ padding: 40 }}>
+        <h1>Вход в Sales Factory</h1>
 
-  // Сохранение изменений
-  const saveEdit = async (id) => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch(`${API_URL}/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: editValues.name,
-          price: Number(editValues.price),
-          table_number: Number(editValues.table_number),
-          note: editValues.note,
-        }),
-      });
-      if (!res.ok) throw new Error("Ошибка обновления");
-      setEditingId(null);
-      loadRows();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+        <input
+          placeholder="Логин"
+          value={login}
+          onChange={(e) => setLogin(e.target.value)}
+        />
+        <br />
 
-  // Отмена редактирования
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditValues({});
-  };
+        <input
+          type="password"
+          placeholder="Пароль"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <br />
 
+        <button onClick={handleLogin}>Войти</button>
+
+        {authError && <p style={{ color: "red" }}>{authError}</p>}
+      </div>
+    );
+  }
+
+  // ======================
+  // RENDER APP
+  // ======================
   return (
-    <div style={{ padding: "20px" }}>
+    <div style={{ padding: 20 }}>
       <h1>Sales Factory</h1>
 
-      {/* Форма добавления */}
-      <div style={{ marginBottom: "20px" }}>
-        <input placeholder="Название" value={name} onChange={e => setName(e.target.value)} />
-        <input placeholder="Цена" type="number" value={price} onChange={e => setPrice(e.target.value)} />
-        <input placeholder="Стол" type="number" value={tableNumber} onChange={e => setTableNumber(e.target.value)} />
-        <input placeholder="Примечание" value={note} onChange={e => setNote(e.target.value)} />
-        <button onClick={addRow}>Добавить строку</button>
+      <p>
+        Пользователь: <b>{user.username}</b> ({user.role})
+      </p>
+
+      <button onClick={logout}>Выйти</button>
+
+      {/* FORM */}
+      <div style={{ margin: "20px 0" }}>
+        <input
+          placeholder="Название"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <input
+          placeholder="Цена"
+          type="number"
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+        />
+
+        {user.role === "owner" && (
+          <input
+            placeholder="Стол"
+            type="number"
+            value={tableNumber}
+            onChange={(e) => setTableNumber(e.target.value)}
+          />
+        )}
+
+        <input
+          placeholder="Примечание"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+        />
+
+        <button onClick={addRow}>Добавить</button>
       </div>
 
       {loading && <p>Загрузка...</p>}
       {error && <p style={{ color: "red" }}>{error}</p>}
 
-      {/* Таблица */}
+      {/* TABLE */}
       <table border="1" cellPadding="5">
         <thead>
           <tr>
@@ -144,33 +203,31 @@ export default function App() {
             <th>Цена</th>
             <th>Стол</th>
             <th>Примечание</th>
-            <th>Действия</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
-          {rows.map(row => (
+          {rows.map((row) => (
             <tr key={row.id}>
               <td>{row.id}</td>
-              <td>{editingId === row.id ? <input value={editValues.name} onChange={e => setEditValues({...editValues, name: e.target.value})} /> : row.name}</td>
-              <td>{editingId === row.id ? <input type="number" value={editValues.price} onChange={e => setEditValues({...editValues, price: e.target.value})} /> : row.price}</td>
-              <td>{editingId === row.id ? <input type="number" value={editValues.table_number} onChange={e => setEditValues({...editValues, table_number: e.target.value})} /> : row.table_number}</td>
-              <td>{editingId === row.id ? <input value={editValues.note} onChange={e => setEditValues({...editValues, note: e.target.value})} /> : row.note}</td>
+              <td>{row.name}</td>
+              <td>{row.price}</td>
+              <td>{row.table_number}</td>
+              <td>{row.note}</td>
               <td>
-                {editingId === row.id ? (
-                  <>
-                    <button onClick={() => saveEdit(row.id)}>Сохранить</button>
-                    <button onClick={cancelEdit}>Отмена</button>
-                  </>
-                ) : (
-                  <>
-                    <button onClick={() => startEditing(row)}>Редактировать</button>
-                    <button onClick={() => deleteRow(row.id)}>Удалить</button>
-                  </>
+                {user.role === "owner" && (
+                  <button onClick={() => deleteRow(row.id)}>Удалить</button>
                 )}
               </td>
             </tr>
           ))}
-          {rows.length === 0 && !loading && <tr><td colSpan="6" style={{ textAlign: "center" }}>Нет данных</td></tr>}
+          {rows.length === 0 && (
+            <tr>
+              <td colSpan="6" align="center">
+                Нет данных
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>

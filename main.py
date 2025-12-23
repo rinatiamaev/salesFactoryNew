@@ -1,8 +1,26 @@
-﻿from fastapi import FastAPI, HTTPException
+﻿from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import sqlite3
+
+# ==============================
+# FAKE USERS (временно)
+# ==============================
+USERS = [
+    {
+        "username": "admin",
+        "password": "admin",
+        "role": "owner",
+        "table_number": None
+    },
+    {
+        "username": "client1",
+        "password": "123",
+        "role": "client",
+        "table_number": 1
+    }
+]
 
 # ==============================
 # Database setup
@@ -55,6 +73,22 @@ def get_rows():
     rows = c.fetchall()
     return [{"id": r[0], "name": r[1], "price": r[2], "table_number": r[3], "note": r[4]} for r in rows]
 
+
+@app.post("/login")
+def login(data: dict = Body(...)):
+    username = data.get("username")
+    password = data.get("password")
+
+    for user in USERS:
+        if user["username"] == username and user["password"] == password:
+            return {
+                "username": user["username"],
+                "role": user["role"],
+                "table_number": user["table_number"]
+            }
+
+    raise HTTPException(status_code=401, detail="Invalid credentials")
+
 @app.post("/rows", response_model=RowResponse)
 def add_row(row: Row):
     c.execute(
@@ -64,6 +98,8 @@ def add_row(row: Row):
     conn.commit()
     row_id = c.lastrowid
     return {"id": row_id, **row.dict()}
+
+
 
 @app.put("/rows/{row_id}", response_model=RowResponse)
 def update_row(row_id: int, row: Row):
