@@ -18,6 +18,10 @@ export default function App() {
   const [tableNumber, setTableNumber] = useState("");
   const [note, setNote] = useState("");
 
+  // ===== EDIT =====
+  const [editingId, setEditingId] = useState(null);
+  const [editValues, setEditValues] = useState({});
+
   const API_URL = "http://127.0.0.1:8000";
 
   // ======================
@@ -29,12 +33,10 @@ export default function App() {
       const res = await fetch(`${API_URL}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: login, password: password }),
+        body: JSON.stringify({ username: login, password }),
       });
-
       if (!res.ok) throw new Error("Неверный логин или пароль");
-
-      const data = await res.json(); // { username, role, table_number }
+      const data = await res.json();
       setUser(data);
       setLogin("");
       setPassword("");
@@ -133,6 +135,46 @@ export default function App() {
   };
 
   // ======================
+  // EDIT ROW
+  // ======================
+  const startEditing = (row) => {
+    setEditingId(row.id);
+    setEditValues({ ...row });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditValues({});
+  };
+
+  const saveEdit = async (id) => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_URL}/rows/${id}`, {
+        method: "PUT",
+        headers: getHeaders(),
+        body: JSON.stringify({
+          name: editValues.name,
+          price: Number(editValues.price),
+          table_number:
+            user.role === "client"
+              ? user.table_number
+              : Number(editValues.table_number),
+          note: editValues.note,
+        }),
+      });
+      if (!res.ok) throw new Error("Ошибка обновления");
+      setEditingId(null);
+      loadRows();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ======================
   // RENDER LOGIN
   // ======================
   if (!user) {
@@ -164,14 +206,12 @@ export default function App() {
   return (
     <div style={{ padding: 20 }}>
       <h1>Sales Factory</h1>
-
       <p>
         Пользователь: <b>{user.username}</b> ({user.role})
       </p>
-
       <button onClick={logout}>Выйти</button>
 
-      {/* FORM */}
+      {/* ADD FORM */}
       <div style={{ margin: "20px 0" }}>
         <input
           placeholder="Название"
@@ -212,20 +252,83 @@ export default function App() {
             <th>Цена</th>
             <th>Стол</th>
             <th>Примечание</th>
-            <th></th>
+            <th>Действия</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.id}>
               <td>{row.id}</td>
-              <td>{row.name}</td>
-              <td>{row.price}</td>
-              <td>{row.table_number}</td>
-              <td>{row.note}</td>
               <td>
-                {user.role === "owner" && (
-                  <button onClick={() => deleteRow(row.id)}>Удалить</button>
+                {editingId === row.id ? (
+                  <input
+                    value={editValues.name}
+                    onChange={(e) =>
+                      setEditValues({ ...editValues, name: e.target.value })
+                    }
+                  />
+                ) : (
+                  row.name
+                )}
+              </td>
+              <td>
+                {editingId === row.id ? (
+                  <input
+                    type="number"
+                    value={editValues.price}
+                    onChange={(e) =>
+                      setEditValues({ ...editValues, price: e.target.value })
+                    }
+                  />
+                ) : (
+                  row.price
+                )}
+              </td>
+              <td>
+                {editingId === row.id && user.role === "owner" ? (
+                  <input
+                    type="number"
+                    value={editValues.table_number}
+                    onChange={(e) =>
+                      setEditValues({
+                        ...editValues,
+                        table_number: e.target.value,
+                      })
+                    }
+                  />
+                ) : (
+                  row.table_number
+                )}
+              </td>
+              <td>
+                {editingId === row.id ? (
+                  <input
+                    value={editValues.note}
+                    onChange={(e) =>
+                      setEditValues({ ...editValues, note: e.target.value })
+                    }
+                  />
+                ) : (
+                  row.note
+                )}
+              </td>
+              <td>
+                {editingId === row.id ? (
+                  <>
+                    <button onClick={() => saveEdit(row.id)}>Сохранить</button>
+                    <button onClick={cancelEdit}>Отмена</button>
+                  </>
+                ) : (
+                  <>
+                    {(user.role === "owner" ||
+                      (user.role === "client" &&
+                        row.table_number === user.table_number)) && (
+                      <button onClick={() => startEditing(row)}>Редактировать</button>
+                    )}
+                    {user.role === "owner" && (
+                      <button onClick={() => deleteRow(row.id)}>Удалить</button>
+                    )}
+                  </>
                 )}
               </td>
             </tr>
