@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState, useCallback } from "react";
 
 export default function App() {
   // ===== AUTH =====
@@ -29,16 +29,15 @@ export default function App() {
       const res = await fetch(`${API_URL}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: login,
-          password: password,
-        }),
+        body: JSON.stringify({ username: login, password: password }),
       });
 
       if (!res.ok) throw new Error("Неверный логин или пароль");
 
-      const data = await res.json();
-      setUser(data); // { username, role, table_number }
+      const data = await res.json(); // { username, role, table_number }
+      setUser(data);
+      setLogin("");
+      setPassword("");
     } catch (err) {
       setAuthError(err.message);
     }
@@ -50,13 +49,22 @@ export default function App() {
   };
 
   // ======================
+  // Заголовки для fetch
+  // ======================
+  const getHeaders = () => ({
+    "Content-Type": "application/json",
+    "X-User": user.username,
+  });
+
+  // ======================
   // LOAD ROWS
   // ======================
-  const loadRows = async () => {
+  const loadRows = useCallback(async () => {
+    if (!user) return;
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API_URL}/rows`);
+      const res = await fetch(`${API_URL}/rows`, { headers: getHeaders() });
       if (!res.ok) throw new Error("Ошибка загрузки данных");
       const data = await res.json();
       setRows(data);
@@ -65,37 +73,32 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
-    if (user) {
-      loadRows();
-    }
-  }, [user]);
+    loadRows();
+  }, [loadRows]);
 
   // ======================
   // ADD ROW
   // ======================
   const addRow = async () => {
+    if (!user) return;
     setLoading(true);
     setError("");
     try {
       const res = await fetch(`${API_URL}/rows`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getHeaders(),
         body: JSON.stringify({
           name,
           price: Number(price),
           table_number:
-            user.role === "client"
-              ? user.table_number
-              : Number(tableNumber),
+            user.role === "client" ? user.table_number : Number(tableNumber),
           note,
         }),
       });
-
       if (!res.ok) throw new Error("Ошибка добавления");
-
       setName("");
       setPrice("");
       setTableNumber("");
@@ -109,11 +112,24 @@ export default function App() {
   };
 
   // ======================
-  // DELETE
+  // DELETE ROW
   // ======================
   const deleteRow = async (id) => {
-    await fetch(`${API_URL}/rows/${id}`, { method: "DELETE" });
-    loadRows();
+    if (!user) return;
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_URL}/rows/${id}`, {
+        method: "DELETE",
+        headers: getHeaders(),
+      });
+      if (!res.ok) throw new Error("Ошибка удаления");
+      loadRows();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ======================
@@ -123,14 +139,12 @@ export default function App() {
     return (
       <div style={{ padding: 40 }}>
         <h1>Вход в Sales Factory</h1>
-
         <input
           placeholder="Логин"
           value={login}
           onChange={(e) => setLogin(e.target.value)}
         />
         <br />
-
         <input
           type="password"
           placeholder="Пароль"
@@ -138,9 +152,7 @@ export default function App() {
           onChange={(e) => setPassword(e.target.value)}
         />
         <br />
-
         <button onClick={handleLogin}>Войти</button>
-
         {authError && <p style={{ color: "red" }}>{authError}</p>}
       </div>
     );
@@ -172,7 +184,6 @@ export default function App() {
           value={price}
           onChange={(e) => setPrice(e.target.value)}
         />
-
         {user.role === "owner" && (
           <input
             placeholder="Стол"
@@ -181,13 +192,11 @@ export default function App() {
             onChange={(e) => setTableNumber(e.target.value)}
           />
         )}
-
         <input
           placeholder="Примечание"
           value={note}
           onChange={(e) => setNote(e.target.value)}
         />
-
         <button onClick={addRow}>Добавить</button>
       </div>
 
