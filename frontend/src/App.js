@@ -9,8 +9,11 @@ export default function App() {
 
   // ===== DATA =====
   const [rows, setRows] = useState([]);
+  const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+
 
   // ===== FORM =====
   const [name, setName] = useState("");
@@ -77,9 +80,27 @@ export default function App() {
     }
   }, [user]);
 
-  useEffect(() => {
-    loadRows();
-  }, [loadRows]);
+  const loadTables = useCallback(async () => {
+  if (!user) return;
+  try {
+    const res = await fetch(`${API_URL}/tables`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error("Ошибка загрузки столов");
+    const data = await res.json();
+    console.log("TABLES FROM API:", data); // ← ВАЖНО
+    setTables(data);
+  } catch (err) {
+    console.error("TABLES ERROR:", err.message);
+  }
+}, [user]);
+
+
+useEffect(() => {
+  loadRows();
+  loadTables();
+}, [loadRows, loadTables]);
+
 
   // ======================
   // ADD ROW
@@ -210,6 +231,13 @@ export default function App() {
         Пользователь: <b>{user.username}</b> ({user.role})
       </p>
       <button onClick={logout}>Выйти</button>
+<h2>Столы</h2>
+{tables.map(t => (
+  <div key={t.id}>
+    Стол ({t.row_index},{t.col_index}) — {t.status}
+  </div>
+))}
+
 
       {/* ADD FORM */}
       <div style={{ margin: "20px 0" }}>
