@@ -184,15 +184,9 @@ def delete_row(row_id: int, current_user: dict = Depends(get_current_user)):
 # ==============================
 @app.get("/tables", response_model=List[TableResponse])
 def get_tables(current_user: dict = Depends(get_current_user)):
-    if current_user["role"] == "owner":
-        c.execute("SELECT id, row_index, col_index, status, owner FROM tables")
-    else:
-        c.execute(
-            "SELECT id, row_index, col_index, status, owner FROM tables WHERE owner = ?",
-            (current_user["username"],)
-        )
-
+    c.execute("SELECT id, row_index, col_index, status, owner FROM tables")
     tables = c.fetchall()
+
     return [
         {
             "id": t[0],
@@ -203,6 +197,7 @@ def get_tables(current_user: dict = Depends(get_current_user)):
         }
         for t in tables
     ]
+
 
 @app.post("/tables", response_model=TableResponse)
 def create_table(table: TableCreate, current_user: dict = Depends(get_current_user)):
