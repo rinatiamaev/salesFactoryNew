@@ -231,12 +231,38 @@ useEffect(() => {
         Пользователь: <b>{user.username}</b> ({user.role})
       </p>
       <button onClick={logout}>Выйти</button>
-<h2>Столы</h2>
-{tables.map(t => (
-  <div key={t.id}>
-    Стол ({t.row_index},{t.col_index}) — {t.status}
-  </div>
-))}
+<h2>Карта столов</h2>
+
+<div
+  style={{
+    display: "grid",
+    gridTemplateColumns: "repeat(5, 80px)",
+    gap: "10px",
+    marginBottom: "30px",
+  }}
+>
+  {tables.map((t) => (
+    <div
+      key={t.id}
+      style={{
+        width: 80,
+        height: 80,
+        border: "2px solid #333",
+        borderRadius: 8,
+        background:
+          t.status === "free" ? "#9ae6b4" : "#feb2b2",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontWeight: "bold",
+        cursor: "pointer",
+      }}
+    >
+      {t.row_index},{t.col_index}
+    </div>
+  ))}
+</div>
+
 
 
       {/* ADD FORM */}
